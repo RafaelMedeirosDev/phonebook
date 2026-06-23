@@ -1,0 +1,13 @@
+{
+  "name": "phonebook",
+  "version": "0.0.1",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run start:dev --workspace=apps/backend",
+    "build:backend": "npm run build --workspace=apps/backend",
+    "lint:backend": "npm run lint --workspace=apps/backend"
+  }
+}
