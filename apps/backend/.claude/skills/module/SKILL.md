@@ -1,89 +1,85 @@
 ---
 name: module
-description: Gera o NestJS Module de uma entidade dentro de src/module/{entity}, registrando Controller, Service(s) e o binding do Repository abstrato (domain) com a implementacao concreta (external). Use depois que Controller, Service, Domain e External da entidade ja existirem.
+description: Registra Controller, Service(s), Tools e o binding do Repository abstrato (domain) com a implementacao concreta (external) de uma entidade diretamente em src/app.module.ts. Use depois que Controller, Service, Domain e External da entidade ja existirem.
 ---
 
-# Skill: Module
+# Skill: Module (registro em AppModule)
 
-O Module e quem liga os fios da entidade: registra o Controller, os Services como providers, e faz o binding de cada Repository abstrato (`domain`) com sua implementacao concreta (`external`/Prisma) via `provide`/`useClass`. Sem esse binding, o Nest nao sabe qual classe concreta instanciar quando um Service pede `{Entity}Repository` no construtor.
+Este projeto **nao** usa um Module por entidade — nao existe pasta `module/` nem arquivo `{Entity}Module.ts`. Tudo e registrado direto em `src/app.module.ts`, que e quem liga os fios: registra o Controller, os Services e as Tools como providers, e faz o binding de cada Repository abstrato (`domain`) com sua implementacao concreta (`external`/Prisma) via `provide`/`useClass`. Sem esse binding, o Nest nao sabe qual classe concreta instanciar quando um Service pede `{Entity}Repository` no construtor.
 
-Este projeto nao usa autenticacao por enquanto — nao inclua `JwtModule`, `PassportModule`, `Strategy` ou `Guard` no module. Se isso mudar no futuro, e uma skill propria.
+Este projeto nao usa autenticacao por enquanto — nao inclua `JwtModule`, `PassportModule`, `Strategy` ou `Guard`. Se isso mudar no futuro, e uma skill propria.
 
 ## Convencoes
 
-- Pasta: `src/module/{entity}/` — nome da entidade em minusculo (snake_case se composto, ex.: `order_service`, `vehicle_user`)
-- Arquivo: `src/module/{entity}/{Entity}Module.ts` — PascalCase, sem kebab-case, sem sufixo com ponto
-- Classe: `{Entity}Module`
-- Imports usam caminho absoluto a partir de `src` (ex.: `'src/domain/{Entity}Repository'`), nao relativo — mesmo padrao usado nas skills `domain`, `external`, `dto` e `service`. Confirmado que o `nest build` reescreve corretamente para `require` relativo no `dist`
-- `controllers`: lista o(s) Controller(s) da entidade
-- `providers` tem dois tipos de entrada:
-  1. Os Services usados pelo Controller, direto pela classe (sem `provide`/`useClass` — Service nao tem abstracao, e a propria implementacao)
-  2. Um `{ provide: {Entity}Repository, useClass: Prisma{Entity}Repository }` para **cada** Repository abstrato que algum Service da entidade injeta — inclui o Repository da propria entidade e qualquer Repository de entidade relacionada usado numa regra de negocio (ex.: validacao de duplicidade)
+- Nao crie nenhum arquivo de module novo — edite `src/app.module.ts` direto
+- `controllers`: adicione o(s) Controller(s) da entidade ao array existente
+- `providers` recebe, por entidade:
+  1. Os Services usados pelo Controller, direto pela classe (sem `provide`/`useClass`)
+  2. Um `{ provide: {Entity}Repository, useClass: Prisma{Entity}Repository }` para **cada** Repository abstrato que algum Service da entidade injeta (inclui Repository de entidade relacionada, se houver)
+  3. As Tools da entidade (skill `tools`), se existirem — e adicione-as tambem ao `inject`/corpo do `useFactory` do provider `TOOLS`
+- `PrismaRemoteRepository` e o provider `TOOLS` ja existem em `app.module.ts` e sao registrados **uma unica vez** (nao por entidade) — so adicione a entidade nova aos lugares certos, nao recrie essas pecas
 
-## Template generico
+## Exemplo (Contact, real e completo)
 
 ```ts
 import { Module } from '@nestjs/common';
-import { {Entity}Controller } from 'src/controller/{Entity}Controller';
-import { {Entity}Repository } from 'src/domain/{Entity}Repository';
-import { Prisma{Entity}Repository } from 'src/external/repositories/remote/Prisma{Entity}Repository';
-import { Create{Entity}Service } from 'src/service/Create{Entity}Service';
-import { List{Entity}Service } from 'src/service/List{Entity}Service';
+import { ConfigModule } from '@nestjs/config';
+import { ContactController } from 'src/controller/ContactController';
+import { ContactRepository } from 'src/domain/ContactRepository';
+import { PrismaContactRepository } from 'src/external/repositories/remote/PrismaContactRepository';
+import { PrismaRemoteRepository } from 'src/external/repositories/remote/PrismaRemoteRepository';
+import { CreateContactService } from 'src/service/CreateContactService';
+import { ListContactService } from 'src/service/ListContactService';
+import { CreateContactTool } from 'src/tools/CreateContactTool';
+import { ListContactTool } from 'src/tools/ListContactTool';
+import { Tool, TOOLS } from 'src/tools/Tool';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
-  controllers: [{Entity}Controller],
+  imports: [ConfigModule.forRoot({ isGlobal: true })],
+  controllers: [AppController, ContactController],
   providers: [
-    Create{Entity}Service,
-    List{Entity}Service,
+    AppService,
+    PrismaRemoteRepository,
+    CreateContactService,
+    ListContactService,
+    CreateContactTool,
+    ListContactTool,
     {
-      provide: {Entity}Repository,
-      useClass: Prisma{Entity}Repository,
+      provide: ContactRepository,
+      useClass: PrismaContactRepository,
+    },
+    {
+      provide: TOOLS,
+      useFactory: (
+        createContactTool: CreateContactTool,
+        listContactTool: ListContactTool,
+      ): Tool[] => [createContactTool, listContactTool],
+      inject: [CreateContactTool, ListContactTool],
     },
   ],
-})
-export class {Entity}Module {}
-```
-
-## Quando a entidade depende de outro Repository
-
-Se algum Service injeta o Repository de outra entidade (ex.: checar duplicidade — ver skill `service`), adicione mais um binding `provide`/`useClass` para ele tambem:
-
-```ts
-providers: [
-  Create{Entity}Service,
-  {
-    provide: {Entity}Repository,
-    useClass: Prisma{Entity}Repository,
-  },
-  {
-    provide: {Related}Repository,
-    useClass: Prisma{Related}Repository,
-  },
-],
-```
-
-## Registrar no AppModule
-
-Depois de criar o module da entidade, importe-o em `src/app.module.ts`:
-
-```ts
-import { {Entity}Module } from 'src/module/{entity}/{Entity}Module';
-
-@Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), {Entity}Module],
-  // ...
 })
 export class AppModule {}
 ```
 
+## Adicionando uma entidade nova
+
+`PrismaRemoteRepository` e o provider `TOOLS` ja existem — nao recrie. Para cada entidade nova:
+
+1. Adicione o Controller em `controllers`
+2. Adicione os Services em `providers`
+3. Adicione `{ provide: {Entity}Repository, useClass: Prisma{Entity}Repository }` em `providers`
+4. Se a entidade tiver Tools: adicione-as em `providers` **e** inclua-as nos parametros/array do `useFactory` do `TOOLS` (tanto no `inject` quanto no corpo da funcao)
+
 ## Escopo desta skill
 
-Esta skill cuida apenas do arquivo `{Entity}Module.ts`. Ela assume que Controller, Service(s), Repository de `domain` e implementacao de `external` ja existem — nao cria nenhum deles aqui.
+Esta skill cuida apenas de editar `src/app.module.ts`. Ela assume que Controller, Service(s), Repository de `domain`, implementacao de `external` e Tools (se houver) ja existem — nao cria nenhum deles aqui.
 
 ## Checklist ao aplicar
 
 1. Confirmar quais Controllers e Services da entidade existem e precisam ser registrados
-2. Confirmar quais Repository abstratos (da propria entidade e de relacionadas) precisam de binding `provide`/`useClass`
-3. Criar `src/module/{entity}/{Entity}Module.ts` seguindo o template
-4. Importar o module criado em `src/app.module.ts`
-5. Rodar o build para validar
+2. Confirmar quais Repository abstratos precisam de binding `provide`/`useClass`
+3. Confirmar se a entidade tem Tools que precisam entrar no `useFactory` do `TOOLS`
+4. Editar `src/app.module.ts` adicionando essas entradas (sem criar nenhum arquivo novo)
+5. Rodar o build **e iniciar a aplicacao** para validar — erro de DI so aparece em runtime, nao no build

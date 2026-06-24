@@ -13,6 +13,7 @@ Define, para uma entidade, o contrato que qualquer implementacao de persistencia
 - Os tipos de input de cada metodo (`Create`, `FindById`, `Update`, ...) sao interfaces simples, nomeadas pela operacao (sem prefixo da entidade — o namespace e o proprio arquivo)
 - `{Entity}s` (plural) e o tipo "hidratado": a entidade base do Prisma (`@prisma/client`) com as relations incluidas (`& { relacao1; relacao2[] }`). E usado em `findAll`/`findById`, que normalmente precisam das relations carregadas
 - A classe `{Entity}Repository` e `abstract` — so declara assinaturas, sem corpo
+- Parametro de entrada e sempre desestruturado direto na assinatura (`{ campo1, campo2 }: Create`), nunca recebido como objeto inteiro (`input: Create`)
 - So declare os metodos que a feature realmente precisa agora — nao especule `update`/`delete` sem necessidade
 
 ## Template generico
@@ -33,7 +34,7 @@ export interface FindById {
 }
 
 export abstract class {Entity}Repository {
-  abstract create(input: Create): Promise<{Entity}>;
+  abstract create({ /* campos de Create */ }: Create): Promise<{Entity}>;
   abstract findAll(): Promise<{Entity}s[]>;
   abstract findById({ id }: FindById): Promise<{Entity}s | null>;
 }
@@ -48,7 +49,7 @@ export interface Update {
 }
 
 // dentro da abstract class:
-abstract update(input: Update): Promise<{Entity}>;
+abstract update({ /* campos de Update */ }: Update): Promise<{Entity}>;
 abstract delete({ id }: FindById): Promise<void>;
 ```
 

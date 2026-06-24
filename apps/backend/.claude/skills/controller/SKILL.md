@@ -19,7 +19,7 @@ Gera a camada HTTP de uma entidade seguindo a convencao do projeto. O Controller
   - `findById` -> `Find{Entity}Service`
   - `update` -> `Update{Entity}Service`
   - `delete` -> `Delete{Entity}Service`
-- Body de entrada sempre tipado por um DTO de `src/shared/dtos/Create{Entity}DTO.ts` (ou `Update{Entity}DTO.ts`), passado direto como parametro
+- Body de entrada sempre tipado por um DTO de `src/shared/dtos/Create{Entity}DTO.ts` (ou `Update{Entity}DTO.ts`), desestruturado direto no parametro (`@Body() { campo1, campo2 }: Create{Entity}DTO`), nunca recebido como objeto inteiro (`@Body() dto: Create{Entity}DTO`)
 - Tipo de retorno depende da operacao (ver "Convencao de retorno" abaixo) — nunca retorna o DTO
 - So gere os endpoints que foram pedidos — nao adicione `update`/`delete`/`findById` especulativamente so porque "completa o CRUD"
 
@@ -33,10 +33,10 @@ Gera a camada HTTP de uma entidade seguindo a convencao do projeto. O Controller
 
 | Operacao   | Decorator        | Parametro                            | Retorno                      |
 |------------|-------------------|----------------------------------------|--------------------------------|
-| create     | `@Post()`         | `@Body() dto: Create{Entity}DTO`       | `Promise<{Entity}>`            |
+| create     | `@Post()`         | `@Body() { ... }: Create{Entity}DTO`   | `Promise<{Entity}>`            |
 | list       | `@Get()`          | —                                       | `Promise<{Entity}s[]>`         |
 | findById   | `@Get(':id')`     | `@Param('id') id: string`              | `Promise<{Entity}s \| null>`   |
-| update     | `@Patch(':id')`   | `@Param('id') id`, `@Body() dto`       | `Promise<{Entity}>`            |
+| update     | `@Patch(':id')`   | `@Param('id') id`, `@Body() { ... }`   | `Promise<{Entity}>`            |
 | delete     | `@Delete(':id')`  | `@Param('id') id: string`              | `Promise<void>`                |
 
 ## Template generico
@@ -57,8 +57,8 @@ export class {Entity}Controller {
   ) {}
 
   @Post()
-  create(@Body() dto: Create{Entity}DTO): Promise<{Entity}> {
-    return this.create{Entity}Service.execute(dto);
+  create(@Body() { /* campos de Create{Entity}DTO */ }: Create{Entity}DTO): Promise<{Entity}> {
+    return this.create{Entity}Service.execute({ /* campos */ });
   }
 
   @Get()
@@ -76,8 +76,8 @@ Pedido concreto: salvar um contato e trazer a lista completa de contatos da agen
 
 - `src/controller/ContactController.ts` -> `ContactController`, rota `/contacts`
 - Injeta `CreateContactService` e `ListContactService`
-- `POST /contacts` com `CreateContactDTO { name, phone, email? }` -> `Promise<Contact>` (de `@prisma/client`)
-- `GET /contacts` -> `Promise<Contacts[]>` (tipo hidratado de `domain/ContactRepository`)
+- `POST /contacts` com `@Body() { name, phone }: CreateContactDTO` -> `Promise<Contact>` (de `@prisma/client`)
+- `GET /contacts` -> `Promise<Contact[]>` (Contact nao tem relations, entao nao existe tipo hidratado separado — ver skill `domain`)
 
 ## Escopo desta skill
 
