@@ -14,7 +14,8 @@ Erros de negocio sao classes, nunca `throw new Error('...')` solto. A pasta `sha
 
 - Arquivo: `src/shared/erros/base/{Category}Error.ts` — PascalCase, sem kebab-case, sem sufixo com ponto
 - Classe: `{Category}Error extends {NestHttpException}` — escolha a exception do Nest que corresponde semanticamente (ver tabela abaixo)
-- Sempre declara 3 properties documentadas com `@ApiProperty` (existem para o Swagger descrever o shape do erro, nao sao atribuidas manualmente): `statusCode: number`, `message: string`, `error: string`
+- Sempre declara 3 properties documentadas com `@ApiProperty` (existem para o Swagger descrever o shape do erro): `statusCode: number`, `message: string`, `error: string`
+- **Essas 3 properties usam `declare`** (`declare public message: string;`, nao `public message!: string;`). Sem `declare`, o TypeScript (com `target` ES2022+, que e o nosso caso) reinicializa a property depois do `super()`, sobrescrevendo com `undefined` o que `super(message, error)` acabou de setar — bug real ja encontrado neste projeto, silencioso porque o erro HTTP cru (via `getResponse()` do Nest) continua mostrando o texto certo, mas qualquer codigo que leia `error.message` direto (ex.: o orquestrador da IA) recebe `undefined`
 - Construtor recebe `(message: string, error: string)` e so chama `super(message, error)` — quem define o status HTTP e a classe do Nest que esta sendo estendida
 - Antes de criar um novo base, verificar se ja nao existe um que cubra a familia HTTP necessaria — varios cases reaproveitam o mesmo base
 
@@ -36,13 +37,13 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class {Category}Error extends {NestHttpException} {
   @ApiProperty({ example: HttpStatus.{STATUS} })
-  public statusCode!: number;
+  declare public statusCode: number;
 
   @ApiProperty({ type: () => String })
-  public message!: string;
+  declare public message: string;
 
   @ApiProperty({ type: () => String })
-  public error!: string;
+  declare public error: string;
 
   constructor(message: string, error: string) {
     super(message, error);

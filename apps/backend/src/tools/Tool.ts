@@ -4,6 +4,7 @@ export interface ToolParameters {
   type: 'object';
   properties: Record<string, unknown>;
   required?: string[];
+  [key: string]: unknown;
 }
 
 export abstract class Tool<Input = any, Output = any> {
